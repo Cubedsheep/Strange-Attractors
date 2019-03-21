@@ -2,6 +2,64 @@ using Random
 using Distributed
 
 
+#---------------------------------------------------------------------------
+# functions to deal with color
+
+
+"""
+    two_schemes(n, cutoff, n_max, scheme1, scheme2)
+
+calculates the color for a given pixel with value n with n_max the max value for a pixel and cuttof the value to switch from scheme1 to scheme2
+"""
+function two_schemes(n::Int64, cutoff::Int64, n_max::Int64, scheme1, scheme2; gamma1=1, gamma2=1)
+    if n < cutoff
+        ratio = 1-(1-n/cutoff)^gamma1
+        return(get(scheme1, ratio))
+    end
+    ratio = ((n-cutoff)/(n_max-cutoff))^gamma2
+    return(get(scheme2, ratio))
+end
+
+
+"""
+function for converting n to a greyscale value, default colormap for
+attractors
+"""
+function map_gray(n, alpha)
+    return UInt8(floor(UInt8, (clamp(n^alpha * typemax(UInt8)^(1-alpha), typemin(UInt8), typemax(UInt8)))))
+end
+
+
+function linear_color(n, n_max, alpha, rgb)
+    color = rgb * n^alpha/n_max^alpha
+    return RGB(color[1], color[2], color[3])
+end
+
+
+function linear_color_white(n, n_max, alpha, rgb)
+    if n == 0
+        color = [1., 1., 1.]
+    else
+        color = rgb * n^alpha/n_max^alpha
+    end
+    return RGB(color[1], color[2], color[3])
+end
+    
+    
+function color_map_background(n, n_max, gamma, rgb, base)
+    color = [red(rgb), green(rgb), blue(rgb)]
+    if n == 0
+        color = base*color
+    else
+        color = (n/n_max)^gamma*color
+    end
+    return RGB(color[1], color[2], color[3])
+end
+
+        
+#---------------------------------------------------------------------------
+# functions to calculate the attractors
+
 """
     next_DeJong(X::Array{Float64,1}, params::Array{Float64,1})
 
@@ -33,6 +91,24 @@ function calc_hist(grid::Array{Int64,2}, params::Array{Float64,1}, MAX::Int64, X
         if grid[i,j] > maxi
             maxi = grid[i,j]
         end
+    end
+    return grid
+end
+
+
+"""
+    calc_n_points(grid, params, N, X, x, y)
+
+calculates N points of the Peter De Jong attractor with parameters params starting
+from the point X on a grid of size x, y
+"""
+function calc_n_points(grid::Array{Int64,2}, params::Array{Float64,1}, N::Int64,
+    X::Array{Float64,1}, x::Int64, y::Int64)
+    for i=1:N
+        X = next_DeJong(X, params)
+        i = floor(Int64, div(y * (X[1]+2), 4)) + 1
+        j = floor(Int64, div(x * (X[2]+2), 4)) + 1
+        grid[i,j] += 1
     end
     return grid
 end
